@@ -1,6 +1,6 @@
 # SaunaTimer
 
-A Particle project named SaunaTimer
+A Particle project named SaunaTimer (my first project)
 
 ## Welcome to your project!
 
