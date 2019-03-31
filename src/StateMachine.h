@@ -49,8 +49,11 @@ class DataStorage
   bool dstRequested;
   bool weatherRequested;
   bool updateTemp;
+  int currentSecond; //needed to recognize change in seconds
   int timeout;
   float outsideTemp;
+  float saunaTemp;
+  float saunaHumidity;
 
   private:
 };

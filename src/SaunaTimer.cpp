@@ -16,6 +16,8 @@ Including libraries needed
 #include "PCF8574.h" // port expander chip via i2c to connect keypad
 #include "MQTT.h" // include mqtt client
 #include "StateMachine.h" // header file for main program
+#include "math.h"
+#include "adafruit-sht31.h"
 
 /**********************************************************************
 instanciation of required objects
@@ -33,8 +35,11 @@ PCF8574 expander(0x40 >> 1); // port expander at adress 0x40 >> 1 (bitshift need
 byte mqttServer[] = { 192,168,001,151 };
 MQTT mqttClient(mqttServer, 1883, callback);
 char buffer[50];
+String mqtt_message;
 
 StateMachine State; // State machine object to hold and lookup states based upon buttons pushed or timer events occured
+
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 DataStorage DataStorage;
 
@@ -102,13 +107,24 @@ void setup()
  lcd.setCursor ( 0, 0 );            // go to the top left corner
  lcd.print("    Sauna Timer"); // write this string on the top row
  lcd.setCursor ( 0, 1 );            // go to the top left corner
- lcd.print("    Version 0.6.1"); // write this string on the top row
+ lcd.print("    Version 0.6.2"); // write this string on the top row
  lcd.setCursor ( 0, 3 );            // go to the top left corner
  lcd.print("by Lio + Christian"); // write this string on the top row
  lcd.setCursor ( 0, 3 );            // go to the top left corner
  delay(1000);
  lcd.print("                        "); // write this string on the top row
  delay(200);
+ 
+ lcd.setCursor ( 0, 3 );            // go to the top left corner
+ lcd.print("SHT31 test"); // write this string on the top row
+ delay(1500);
+
+  if (! sht31.begin(0x44)) {   // Set to 0x45 for alternate i2c addr
+    lcd.setCursor ( 0, 3 );
+    lcd.println("Couldn't find SHT31");
+    }
+  delay(1500);
+
  DataStorage.dstRequested = TRUE;
  Particle.publish("get_DST");
  lcd.setCursor ( 0, 3 );            // go to the top left corner
@@ -154,6 +170,9 @@ void loop()
         {
         mqttClient.publish("/System/fhem/cmnd","set kgsa_RGBWDimmer_Color color 100");
         mqttClient.publish("/System/fhem/cmnd","set kgsa_RGBWDimmer_Dim pct 0");
+        mqttClient.publish("/Keller/Sauna/status","off");
+        mqtt_message = "\{\"turn\": \"off\",\"red\": 0,\"green\": 0,\"blue\": 255,\"white\": 10,\"gain\": 10,\"effect\": 0\}";
+        mqttClient.publish("shellies/shellyrgbw2-2B90D9/color/0/set", mqtt_message);
         }
         State.updateData = TRUE;
       }
@@ -200,11 +219,16 @@ void loop()
         {
           mqttClient.publish("/System/fhem/cmnd","set kgsa_RGBWDimmer_Color color 100");
           mqttClient.publish("/System/fhem/cmnd","set kgsa_RGBWDimmer_Dim pct 50");
+          mqttClient.publish("/Keller/Sauna/status","on");
+          mqtt_message = "\{\"turn\": \"on\",\"red\": 0,\"green\": 0,\"blue\": 255,\"white\": 10,\"gain\": 10,\"effect\": 0\}";
+          mqttClient.publish("shellies/shellyrgbw2-2B90D9/color/0/set", mqtt_message);
+
         }
         led.print(SaunaClock.getDigit(0),SaunaClock.getDigit(1),SaunaClock.getDigit(2),SaunaClock.getDigit(3));
         lcd.clear();
         lcd.setCursor(0,1);
         lcd.print("Mach dich nackig...");
+        //lcd.print(mqtt_message);
       }
       /********** conditional executions ***********/
       /*  only executed if certain flags are set   */
@@ -287,7 +311,21 @@ void loop()
   {
     State.onButton(1);
   }
-
+  
+  /*  Action on second change */
+  if(!(DataStorage.currentSecond == Time.second()))
+  {
+  /*  draw sanaTemp */
+  DataStorage.saunaTemp = sht31.readTemperature();
+  DataStorage.saunaHumidity = sht31.readHumidity();
+  lcd.setCursor(0,2);
+        lcd.print("Sauna: ");
+        lcd.printf("%.1f", DataStorage.saunaTemp);
+        lcd.printf(" %cC ", 0xDF);
+  mqttClient.publish("/Keller/Sauna/temperatur", String(DataStorage.saunaTemp));
+  mqttClient.publish("/Keller/Sauna/humidity", String(DataStorage.saunaHumidity));
+  DataStorage.currentSecond = Time.second();
+  }
   /*  draw clock                               */
   lcd.setCursor(15,0);
   if ( Time.second() % 2 == 0) // check if it is an even or odd second
