@@ -1,5 +1,5 @@
-SaunaTimer
-## SaunaTimer based on Particle Photon
+# SaunaTimer
+## Sauna Timer based on Particle Photon
 The purpose of this project is a precise timer used as an application within a Sauna. It features:
 
 	- Precise Sauna Timer
